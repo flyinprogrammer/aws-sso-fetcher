@@ -35,7 +35,7 @@ export AWS_PROFILE=acme_dev
 aws sso login
 ```
 
-You can then start using software with the other wrap profile:
+You can then start using software with the other wrapper profile:
 
 ```bash
 export AWS_PROFILE=wrap_acme_dev
@@ -43,5 +43,5 @@ aws ec2 describe-vpcs
 ```
 
 But of course you didn't download this tool to use it with the
-AWS CLI, you used it so that you could launch other applications
-using `AWS_PROFILE` or wrapper scripts.
+AWS CLI, you downloaded it so that you could launch other applications
+using `AWS_PROFILE` without wrapper scripts.
