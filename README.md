@@ -22,7 +22,7 @@ region = us-east-2
 output = json
 
 [profile wrap_acme_dev]
-credential_process = "/Users/alice/bin/aws-sso-fetcher" "acme_dev"
+credential_process = /Users/alice/bin/aws-sso-fetcher acme_dev
 region = us-west-1
 output = json
 
