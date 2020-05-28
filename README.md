@@ -20,15 +20,7 @@ sso_account_id = 0123456789
 sso_role_name = AWSAdministratorAccess
 region = us-east-2
 output = json
-```
-
-And in your `~/.aws/credentials`, you'll need something like this:
-```ini
-[profile wrap_acme_dev]
 credential_process = /Users/alice/bin/aws-sso-fetcher acme_dev
-region = us-west-1
-output = json
-
 ```
 
 Once you get SSO credentials with:
@@ -37,13 +29,21 @@ Once you get SSO credentials with:
 aws sso login --profile=acme_dev
 ```
 
-You can then start using software with the other wrapper profile:
+You can then start using all kinds of software with the profile:
 
 ```bash
-export AWS_PROFILE=wrap_acme_dev
+export AWS_PROFILE=acme_dev
 aws ec2 describe-vpcs
 ```
 
 But of course you didn't download this tool to use it with the
 AWS CLI, you downloaded it so that you could launch other applications
 using `AWS_PROFILE` without wrapper scripts.
+
+It's also been reported that you might need to also set:
+
+```bash
+export AWS_SDK_LOAD_CONFIG=1
+```
+
+to get Golang applications (i.e. `terraform`) to correctly use the the `config` file.
