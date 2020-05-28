@@ -32,7 +32,7 @@ type CredentialProcessJson struct {
 	AccessKeyID string `json:"AccessKeyId"`
 	SecretAccessKey string `json:"SecretAccessKey"`
 	SessionToken string `json:"SessionToken"`
-	Expiration time.Time `json:"Expiration"`
+	Expiration AWSTime `json:"Expiration"`
 }
 
 type Profile struct {
@@ -46,15 +46,19 @@ type AWSTime struct {
 	time.Time
 }
 
-func (t *AWSTime) UnmarshalJSON(buf []byte) error {
-
-	tt, err := time.Parse(time.RFC3339, strings.Trim(strings.Replace(string(buf), "UTC", "Z", 1), `"`))
-	if err != nil {
-		return err
+func (it *AWSTime) UnmarshalJSON(data []byte) error {
+	t, err := time.Parse("2006-01-02T15:04:05Z07:00", strings.Trim(strings.Replace(string(data), "UTC", "Z", 1), `"`))
+	if err == nil {
+		*it = AWSTime{t}
 	}
-	t.Time = tt
-	return nil
+
+	return err
 }
+
+func (it AWSTime) MarshalJSON() ([]byte, error) {
+	return []byte(fmt.Sprintf("\"%sZ\"", it.Time.UTC().Format("2006-01-02T15:04:05"))), nil
+}
+
 
 func main(){
 	zerolog.SetGlobalLevel(zerolog.InfoLevel)
@@ -152,7 +156,7 @@ func getCachedFile(awsSsoCachePath, awsSSOProfileName string) (*CredentialProces
 	if err != nil {
 		return nil, err
 	}
-	if time.Now().After(credentialProcessJson.Expiration) {
+	if time.Now().After(credentialProcessJson.Expiration.Time) {
 		log.Debug().Str("expire", credentialProcessJson.Expiration.String()).Msg("credentials expired")
 		return nil, nil
 	}
@@ -197,7 +201,7 @@ func getSsoRoleCredentials(profile Profile, awsSSOCredential AWSSSOCredential) (
 		AccessKeyID:     *resp.RoleCredentials.AccessKeyId,
 		SecretAccessKey: *resp.RoleCredentials.SecretAccessKey,
 		SessionToken:    *resp.RoleCredentials.SessionToken,
-		Expiration:      aws.MillisecondsTimeValue(resp.RoleCredentials.Expiration),
+		Expiration:      AWSTime{aws.MillisecondsTimeValue(resp.RoleCredentials.Expiration)},
 	}, nil
 }
 

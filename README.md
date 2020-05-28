@@ -20,7 +20,10 @@ sso_account_id = 0123456789
 sso_role_name = AWSAdministratorAccess
 region = us-east-2
 output = json
+```
 
+And in your `~/.aws/credentials`, you'll need something like this:
+```ini
 [profile wrap_acme_dev]
 credential_process = /Users/alice/bin/aws-sso-fetcher acme_dev
 region = us-west-1
@@ -31,8 +34,7 @@ output = json
 Once you get SSO credentials with:
 
 ```bash
-export AWS_PROFILE=acme_dev
-aws sso login
+aws sso login --profile=acme_dev
 ```
 
 You can then start using software with the other wrapper profile:
