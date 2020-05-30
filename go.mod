@@ -1,4 +1,4 @@
-module aws-sso-fetcher
+module github.com/flyinprogrammer/aws-sso-fetcher
 
 go 1.14
 
