@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bytes"
 	"context"
 	"crypto/md5"
 	"encoding/hex"
@@ -126,12 +127,14 @@ func main(){
 func writeCachedFile(awsSsoCachePath, awsSSOProfileName string, credentialProcessJson CredentialProcessJson) error {
 	cachedFileName := getCachedFileName(awsSSOProfileName)
 	cachedFilePath := filepath.Join(awsSsoCachePath, cachedFileName)
-
-	prettyJson, err := json.MarshalIndent(credentialProcessJson, "", "  ")
+	buffer, err := jsonEncode(credentialProcessJson)
 	if err != nil {
 		return err
 	}
-	err = ioutil.WriteFile(cachedFilePath, prettyJson, 0600)
+	if err != nil {
+		return err
+	}
+	err = ioutil.WriteFile(cachedFilePath, buffer.Bytes(), 0600)
 	if err != nil {
 		return err
 	}
@@ -170,14 +173,23 @@ func getCachedFileName(awsSSOProfileName string) string {
 }
 
 func printProfile(credentialProcessJson CredentialProcessJson) {
-	prettyJson, err := json.MarshalIndent(credentialProcessJson, "", "  ")
+	buffer, err := jsonEncode(credentialProcessJson)
 	if err != nil {
-		log.Fatal().Err(err).Msg("marshalling json exploded")
+		log.Fatal().Err(err).Msg("encoding json exploded")
 	}
-
-	fmt.Println(string(prettyJson))
+	fmt.Printf("%s", buffer.String())
 }
 
+func jsonEncode(credentialProcessJson CredentialProcessJson) (*bytes.Buffer, error) {
+	buffer := new(bytes.Buffer)
+	encoder := json.NewEncoder(buffer)
+	encoder.SetIndent("", " ")
+	err := encoder.Encode(credentialProcessJson)
+	if err != nil {
+		return nil, err
+	}
+	return buffer, nil
+}
 
 func getSsoRoleCredentials(profile Profile, awsSSOCredential AWSSSOCredential) (CredentialProcessJson, error) {
 
