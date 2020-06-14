@@ -216,7 +216,6 @@ func getSsoCachedLogin(profile Profile, ssoCachePath string) (AWSSSOCredential, 
 
 	bs := sha1.Sum([]byte(profile.SSOStartUrl))
 	cachedFilePath := filepath.Join(ssoCachePath, fmt.Sprintf("%x.json", bs))
-
 	bytes, err := ioutil.ReadFile(cachedFilePath)
 	if err != nil {
 		return awsSSOCredential, err
