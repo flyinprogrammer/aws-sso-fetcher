@@ -3,7 +3,7 @@ package main
 import (
 	"bytes"
 	"context"
-	"crypto/md5"
+	"crypto/sha1"
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
@@ -22,25 +22,25 @@ import (
 )
 
 type AWSSSOCredential struct {
-	StartURL string `json:"startUrl"`
-	Region string `json:"region"`
-	AccessToken string `json:"accessToken"`
-	ExpiresAt AWSTime `json:"expiresAt"`
+	StartURL    string  `json:"startUrl"`
+	Region      string  `json:"region"`
+	AccessToken string  `json:"accessToken"`
+	ExpiresAt   AWSTime `json:"expiresAt"`
 }
 
 type CredentialProcessJson struct {
-	Version int  `json:"Version"`
-	AccessKeyID string `json:"AccessKeyId"`
-	SecretAccessKey string `json:"SecretAccessKey"`
-	SessionToken string `json:"SessionToken"`
-	Expiration AWSTime `json:"Expiration"`
+	Version         int     `json:"Version"`
+	AccessKeyID     string  `json:"AccessKeyId"`
+	SecretAccessKey string  `json:"SecretAccessKey"`
+	SessionToken    string  `json:"SessionToken"`
+	Expiration      AWSTime `json:"Expiration"`
 }
 
 type Profile struct {
 	SSOAccountID string
-	SSORegion string
-	SSORoleName string
-	SSOStartUrl string
+	SSORegion    string
+	SSORoleName  string
+	SSOStartUrl  string
 }
 
 type AWSTime struct {
@@ -60,8 +60,7 @@ func (it AWSTime) MarshalJSON() ([]byte, error) {
 	return []byte(fmt.Sprintf("\"%sZ\"", it.Time.UTC().Format("2006-01-02T15:04:05"))), nil
 }
 
-
-func main(){
+func main() {
 	zerolog.SetGlobalLevel(zerolog.InfoLevel)
 	_, ok := os.LookupEnv("DEBUG")
 	if ok {
@@ -144,14 +143,9 @@ func writeCachedFile(awsSsoCachePath, awsSSOProfileName string, credentialProces
 func getCachedFile(awsSsoCachePath, awsSSOProfileName string) (*CredentialProcessJson, error) {
 	cachedFileName := getCachedFileName(awsSSOProfileName)
 	cachedFilePath := filepath.Join(awsSsoCachePath, cachedFileName)
-	fInfo, err := os.Stat(cachedFilePath)
-	if os.IsNotExist(err) {
-		log.Debug().Str("path", cachedFilePath).Msg("cache file doesn't exist")
-		return nil, nil
-	}
 	var credentialProcessJson CredentialProcessJson
 
-	bytes, err := readJsonFile(awsSsoCachePath, fInfo)
+	bytes, err := ioutil.ReadFile(cachedFilePath)
 	if err != nil {
 		return nil, err
 	}
@@ -168,8 +162,8 @@ func getCachedFile(awsSsoCachePath, awsSSOProfileName string) (*CredentialProces
 }
 
 func getCachedFileName(awsSSOProfileName string) string {
-	md5ProfileName := md5.Sum([]byte(awsSSOProfileName))
-	return fmt.Sprintf("aws-sso-fetcher-%s.json", hex.EncodeToString(md5ProfileName[:]))
+	profileNameSha1 := sha1.Sum([]byte(awsSSOProfileName))
+	return fmt.Sprintf("aws-sso-fetcher-%s.json", hex.EncodeToString(profileNameSha1[:]))
 }
 
 func printProfile(credentialProcessJson CredentialProcessJson) {
@@ -220,68 +214,25 @@ func getSsoRoleCredentials(profile Profile, awsSSOCredential AWSSSOCredential) (
 func getSsoCachedLogin(profile Profile, ssoCachePath string) (AWSSSOCredential, error) {
 	var awsSSOCredential AWSSSOCredential
 
-	filesToInvestigate, err := ioutil.ReadDir(ssoCachePath)
+	bs := sha1.Sum([]byte(profile.SSOStartUrl))
+	cachedFilePath := filepath.Join(ssoCachePath, fmt.Sprintf("%x.json", bs))
+
+	bytes, err := ioutil.ReadFile(cachedFilePath)
 	if err != nil {
 		return awsSSOCredential, err
 	}
-	log.Debug().Int("fileCount", len(filesToInvestigate)).Msg("found files")
-	for _, f := range filesToInvestigate {
-		log.Debug().Str("path", f.Name()).Msg("looking at file")
-		if f.IsDir() {
-			log.Debug().Bool("isDir", f.IsDir()).Msg("found dir, not opening")
-			continue
-		}
 
-		bytes, err := readJsonFile(ssoCachePath, f)
-		if err != nil {
-			return awsSSOCredential, err
-		}
-
-		err = json.Unmarshal(bytes, &awsSSOCredential)
-		if err != nil {
-			return awsSSOCredential, err
-		}
-
-		if awsSSOCredential.StartURL != profile.SSOStartUrl {
-			log.Debug().
-				Str("file", f.Name()).
-				Str("JsonStartURL", awsSSOCredential.StartURL).
-				Str("SSOStartURL", profile.SSOStartUrl).
-				Msg("start urls did not match")
-			continue
-		}
-		if awsSSOCredential.Region != profile.SSORegion {
-			log.Debug().
-				Str("file", f.Name()).
-				Str("JsonRegion", awsSSOCredential.Region).
-				Str("SSORegion", profile.SSORegion).
-				Msg("regions did not match")
-			continue
-		}
-		if time.Now().After(awsSSOCredential.ExpiresAt.Time) {
-			log.Debug().Str("ExpiresAt", awsSSOCredential.ExpiresAt.String()).Msg("credential is expired")
-			continue
-		}
-
-		log.Debug().Str("file", f.Name()).Msg("found a file that will work")
-		return awsSSOCredential, nil
-	}
-	return AWSSSOCredential{}, fmt.Errorf("found no credential to use to create creds, log back into AWS SSO")
-}
-
-func readJsonFile(ssoCachePath string, f os.FileInfo) ([]byte, error) {
-	jsonFile, err := os.Open(filepath.Join(ssoCachePath, f.Name()))
+	err = json.Unmarshal(bytes, &awsSSOCredential)
 	if err != nil {
-		return nil, err
+		return awsSSOCredential, err
 	}
-	defer func() {
-		err := jsonFile.Close()
-		if err != nil {
-			log.Error().Err(err).Msg("yo I couldn't close a file, that's super scary")
-		}
-	}()
-	byteValue, _ := ioutil.ReadAll(jsonFile)
-	return byteValue, nil
+
+	if time.Now().After(awsSSOCredential.ExpiresAt.Time) {
+		log.Debug().Str("ExpiresAt", awsSSOCredential.ExpiresAt.String()).Msg("credential is expired")
+		return awsSSOCredential, fmt.Errorf("Credentials expired")
+	}
+
+	return awsSSOCredential, nil
 }
 
 func parseProfile(section *ini.Section) (Profile, error) {
@@ -294,7 +245,7 @@ func parseProfile(section *ini.Section) (Profile, error) {
 	log.Debug().Str("id", profileAccountId.String()).Msg("found account id")
 	profile.SSOAccountID = profileAccountId.String()
 
-	profileRegionKey, err := section .GetKey("sso_region")
+	profileRegionKey, err := section.GetKey("sso_region")
 	if err != nil {
 		return profile, fmt.Errorf("error getting sso_region from profile: %w", err)
 	}
