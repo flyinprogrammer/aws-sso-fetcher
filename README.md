@@ -1,5 +1,18 @@
 # AWS SSO Fetcher
 
+# Depreciation Notice
+
+Please stop using this tool and start using [aws-vault](https://github.com/99designs/aws-vault) instead.
+
+[v6.0.0-beta5](https://github.com/99designs/aws-vault/releases/tag/v6.0.0-beta5)
+
+Has support for SSO via [PR-594](https://github.com/99designs/aws-vault/pull/549)
+
+`aws-vault` has a community and is leading from the front in terms of keeping your
+credentials secure. We should all go support them.
+
+---
+
 Right now, most AWS SDKs don't support the new SSO credential
 provider that the AWS CLI v2 supports.
 
